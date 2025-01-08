@@ -7,9 +7,50 @@ from .forms import ProductForm
 from django.db.models import Count, Sum
 from django.db.models.functions import Round
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
 
+PRODUCTS_PER_PAGE = 10
+
 def product_list(request):
+    products_list = Product.objects.all()
+    
+    paginator = Paginator(products_list, PRODUCTS_PER_PAGE)
+    page = request.GET.get('page')
+    
+    try:
+        products = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page
+        products = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range, deliver last page of results
+        products = paginator.page(paginator.num_pages)
+    
+    # Rest of your existing view code...
+    low_stock = []
+    category_data = products_list.values('category').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    stock_status = None
+    products_json = []
+    for product in products_list:  # Use products_list here, not paginated products
+        if product.latitude and product.longitude:
+            products_json.append({
+                'name': product.name,
+                'latitude': float(product.latitude),
+                'longitude': float(product.longitude),
+                'location': product.location
+            })
+
+    return render(request, 'products/product_list.html', {
+        'products': products,  # This is now paginated
+        'low_stock': low_stock,
+        'category_data': category_data,
+        'products_json': json.dumps(products_json, cls=DjangoJSONEncoder),
+        'stock_status': stock_status,
+    })
     products = Product.objects.all()
     low_stock = []
     
@@ -41,7 +82,7 @@ def product_list(request):
 
 @login_required
 def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk, user=request.user)
+    product = get_object_or_404(Product, pk=pk)
     return render(request, 'products/product_detail.html', {'product': product})
 
 @login_required
