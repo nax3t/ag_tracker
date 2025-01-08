@@ -62,9 +62,26 @@
                     </div>
                 {% endif %}
                 {% if product.location %}
-                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Storage Location</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ product.location }}</dd>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Location</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            {{ product.location }}
+                            {% if product.latitude and product.longitude %}
+                                <div class="mt-2 h-48">
+                                    <div id="detail-map" class="h-full rounded-md"></div>
+                                </div>
+                                <script>
+                                    const detailMap = L.map('detail-map').setView([{{ product.latitude }}, {{ product.longitude }}], 12);
+                                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                        attribution: '© OpenStreetMap contributors'
+                                    }).addTo(detailMap);
+                                    
+                                    L.marker([{{ product.latitude }}, {{ product.longitude }}])
+                                        .bindPopup("{{ product.location }}")
+                                        .addTo(detailMap);
+                                </script>
+                            {% endif %}
+                        </dd>
                     </div>
                 {% endif %}
                 {% if product.description %}

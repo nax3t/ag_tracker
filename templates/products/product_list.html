@@ -1,5 +1,11 @@
 {% extends "products/base_products.html" %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
 {% block product_actions %}
     {% if user.is_authenticated %}
         <a href="{% url 'products:create' %}" 
@@ -15,6 +21,17 @@
 {% endblock %}
 
 {% block product_content %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-4">Products by Category</h3>
+            <canvas id="categoryChart"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-4">Product Locations</h3>
+            <div id="map" style="height: 400px;"></div>
+        </div>
+    </div>
+
     {% if user.is_authenticated and low_stock %}
         <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
             <h2 class="text-lg font-semibold text-yellow-800 mb-2">Low Stock Alert</h2>
@@ -38,6 +55,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost/Unit</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                         {% if user.is_authenticated %}
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         {% endif %}
@@ -57,6 +75,7 @@
                             <td class="px-6 py-4 whitespace-nowrap">{{ product.get_category_display }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ product.get_quantity_display }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">${{ product.cost_per_unit }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ product.location }}</td>
                             {% if user.is_authenticated %}
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                     <a href="{% url 'products:update' product.pk %}" 
@@ -86,4 +105,157 @@
             {% endif %}
         </div>
     {% endif %}
+
+    <script>
+        // Initialize map with US bounds
+        const map = L.map('map', {
+            minZoom: 3  // Prevent zooming out too far
+        }).setView([39.8283, -98.5795], 3);  // Center of USA, zoomed out more
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Set bounds to continental US (with some padding)
+        const usBounds = L.latLngBounds(
+            [24.396308, -125.000000],  // Southwest
+            [49.384358, -66.934570]    // Northeast
+        );
+        map.fitBounds(usBounds);
+
+        // Add markers for products
+        const products = {{ products_json|safe }};
+        const markers = {};  // To store markers by location
+
+        products.forEach(product => {
+            if (product.latitude && product.longitude) {
+                const key = `${product.latitude},${product.longitude}`;
+                if (!markers[key]) {
+                    markers[key] = {
+                        count: 0,
+                        products: [],
+                        lat: product.latitude,
+                        lng: product.longitude,
+                        location: product.location
+                    };
+                }
+                markers[key].count++;
+                markers[key].products.push(product.name);
+            }
+        });
+
+        // Create markers with size based on product count
+        Object.values(markers).forEach(marker => {
+            const size = Math.max(20, Math.min(50, marker.count * 10));
+            const icon = L.divIcon({
+                html: `<div class="bg-blue-500 rounded-full flex items-center justify-center text-white" style="width:${size}px;height:${size}px;">
+                        <span class="text-sm">${marker.count}</span>
+                      </div>`,
+                className: 'custom-marker',
+                iconSize: [size, size]
+            });
+
+            L.marker([marker.lat, marker.lng], {icon: icon})
+                .bindPopup(`
+                    <strong>${marker.location}</strong><br>
+                    ${marker.count} product${marker.count > 1 ? 's' : ''}<br>
+                    <small>${marker.products.join(', ')}</small>
+                `)
+                .addTo(map);
+        });
+
+        // Category Chart
+        const categoryData = {{ category_data|safe }};
+        const categoryColors = {
+            'SEED': 'rgba(16, 185, 129, 0.5)',  // Green
+            'FERT': 'rgba(59, 130, 246, 0.5)',  // Blue
+            'PEST': 'rgba(239, 68, 68, 0.5)',   // Red
+            'TOOL': 'rgba(245, 158, 11, 0.5)',  // Yellow
+            'FEED': 'rgba(168, 85, 247, 0.5)',  // Purple
+            'LIVE': 'rgba(236, 72, 153, 0.5)',  // Pink
+            'CROP': 'rgba(14, 165, 233, 0.5)',  // Sky Blue
+            'OTHER': 'rgba(156, 163, 175, 0.5)' // Gray
+        };
+
+        const categoryBorders = {
+            'SEED': 'rgb(16, 185, 129)',
+            'FERT': 'rgb(59, 130, 246)',
+            'PEST': 'rgb(239, 68, 68)',
+            'TOOL': 'rgb(245, 158, 11)',
+            'FEED': 'rgb(168, 85, 247)',
+            'LIVE': 'rgb(236, 72, 153)',
+            'CROP': 'rgb(14, 165, 233)',
+            'OTHER': 'rgb(156, 163, 175)'
+        };
+
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: {
+                labels: categoryData.map(item => {
+                    const label = item.category;
+                    switch(label) {
+                        case 'SEED': return 'Seeds';
+                        case 'FERT': return 'Fertilizer';
+                        case 'PEST': return 'Pesticide';
+                        case 'TOOL': return 'Tools';
+                        case 'FEED': return 'Feed';
+                        case 'LIVE': return 'Livestock';
+                        case 'CROP': return 'Crops';
+                        default: return 'Other';
+                    }
+                }),
+                datasets: [{
+                    label: 'Number of Products',
+                    data: categoryData.map(item => item.count),
+                    backgroundColor: categoryData.map(item => categoryColors[item.category]),
+                    borderColor: categoryData.map(item => categoryBorders[item.category]),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+
+        {% if user.is_authenticated and stock_status %}
+            // Stock Status Chart
+            const stockData = {{ stock_status|safe }};
+            new Chart(document.getElementById('stockChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(stockData),
+                    datasets: [{
+                        data: Object.values(stockData),
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.5)',
+                            'rgba(34, 197, 94, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgb(239, 68, 68)',
+                            'rgb(34, 197, 94)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        {% endif %}
+    </script>
 {% endblock %} 

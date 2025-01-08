@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Product(models.Model):
     CATEGORY_CHOICES = [
@@ -34,6 +35,26 @@ class Product(models.Model):
     expiry_date = models.DateField(null=True, blank=True)
     supplier = models.CharField(max_length=100, blank=True)
     location = models.CharField(max_length=100, blank=True)  # Storage location
+    latitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        validators=[
+            MinValueValidator(-90),
+            MaxValueValidator(90)
+        ]
+    )
+    longitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        validators=[
+            MinValueValidator(-180),
+            MaxValueValidator(180)
+        ]
+    )
     
     # Metadata
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -55,3 +76,15 @@ class Product(models.Model):
 
     def is_low_stock(self):
         return self.quantity <= self.minimum_stock 
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # If one coordinate is provided, both must be provided
+        if bool(self.latitude) != bool(self.longitude):
+            raise ValidationError(
+                "Both latitude and longitude must be provided together."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs) 
