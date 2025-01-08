@@ -5,10 +5,15 @@ from django.db import models
 from .models import Product
 from .forms import ProductForm
 
-@login_required
 def product_list(request):
-    products = Product.objects.filter(user=request.user)
-    low_stock = products.filter(quantity__lte=models.F('minimum_stock'))
+    # If user is logged in, show their products, otherwise show all products
+    if request.user.is_authenticated:
+        products = Product.objects.filter(user=request.user)
+        low_stock = products.filter(quantity__lte=models.F('minimum_stock'))
+    else:
+        products = Product.objects.all()
+        low_stock = []
+    
     return render(request, 'products/product_list.html', {
         'products': products,
         'low_stock': low_stock
