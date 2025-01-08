@@ -61,15 +61,23 @@ def product_list(request):
                 'location': product.location
             })
 
-    return render(request, 'products/product_list.html', {
+    context = {
         'products': products,
         'low_stock': [],
         'category_data': list(category_data),
         'products_json': json.dumps(products_json, cls=DjangoJSONEncoder),
         'stock_status': None,
-        'product_categories': product_categories
-    })
+        'product_categories': product_categories,
+        'request': request  # Add request to context for checking GET parameters
+    }
     
+    if request.headers.get('HX-Request'):
+        # Return only the table content for HTMX requests
+        return render(request, 'products/partials/product_table.html', context)
+    
+    # Return full page for regular requests
+    return render(request, 'products/product_list.html', context)
+
 @login_required
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
