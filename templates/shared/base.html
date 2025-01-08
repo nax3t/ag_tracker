@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AG Tracker{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="//unpkg.com/alpinejs" defer></script>
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <!-- Navigation -->
     <nav class="bg-white shadow-lg">
         <div class="max-w-6xl mx-auto px-4">
             <div class="flex justify-between items-center h-16">
@@ -65,5 +63,7 @@
         {% block content %}
         {% endblock %}
     </main>
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </body>
 </html> 
