@@ -13,6 +13,14 @@
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
                     <a href="/" class="text-xl font-bold text-gray-800">AG Tracker</a>
+                    {% if user.is_authenticated %}
+                        <nav class="ml-6 space-x-4">
+                            <a href="{% url 'products:list' %}" 
+                               class="text-gray-600 hover:text-gray-900">Products</a>
+                            <a href="{% url 'products:create' %}" 
+                               class="text-gray-600 hover:text-gray-900">Add Product</a>
+                        </nav>
+                    {% endif %}
                 </div>
                 <div class="flex items-center space-x-4">
                     {% if user.is_authenticated %}
