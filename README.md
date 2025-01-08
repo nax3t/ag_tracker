@@ -2,6 +2,9 @@
 
 A Django+HTMX web application for tracking agricultural products
 
+## Preview
+![AG Tracker](screenshots/ag_tracker_screenshot_01.png)
+
 ## Prerequisites
 
 - Python 3.12.6
