@@ -14,56 +14,45 @@ PRODUCTS_PER_PAGE = 10
 
 def product_list(request):
     products_list = Product.objects.all()
+    product_categories = Product._meta.get_field('category').choices
     
+    # Filter by category
+    category = request.GET.get('category')
+    if category:
+        products_list = products_list.filter(category=category)
+    
+    # Search by name
+    search_query = request.GET.get('search')
+    if search_query:
+        products_list = products_list.filter(name__icontains=search_query)
+    
+    # Get category data for chart (before pagination)
+    category_counts = products_list.values('category').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    category_data = [
+        {
+            'category': count_data['category'],
+            'count': count_data['count']
+        }
+        for count_data in category_counts
+    ]
+    
+    # Pagination
     paginator = Paginator(products_list, PRODUCTS_PER_PAGE)
     page = request.GET.get('page')
     
     try:
         products = paginator.page(page)
     except PageNotAnInteger:
-        # If page is not an integer, deliver first page
         products = paginator.page(1)
     except EmptyPage:
-        # If page is out of range, deliver last page of results
         products = paginator.page(paginator.num_pages)
     
-    # Rest of your existing view code...
-    low_stock = []
-    category_data = products_list.values('category').annotate(
-        count=Count('id')
-    ).order_by('-count')
-    
-    stock_status = None
+    # Map data (using full list, not paginated)
     products_json = []
-    for product in products_list:  # Use products_list here, not paginated products
-        if product.latitude and product.longitude:
-            products_json.append({
-                'name': product.name,
-                'latitude': float(product.latitude),
-                'longitude': float(product.longitude),
-                'location': product.location
-            })
-
-    return render(request, 'products/product_list.html', {
-        'products': products,  # This is now paginated
-        'low_stock': low_stock,
-        'category_data': category_data,
-        'products_json': json.dumps(products_json, cls=DjangoJSONEncoder),
-        'stock_status': stock_status,
-    })
-    products = Product.objects.all()
-    low_stock = []
-    
-    # Chart data for all products
-    category_data = products.values('category').annotate(
-        count=Count('id')
-    ).order_by('-count')
-    
-    stock_status = None
-
-    # Prepare product location data for the map
-    products_json = []
-    for product in products:
+    for product in products_list:
         if product.latitude and product.longitude:
             products_json.append({
                 'name': product.name,
@@ -74,12 +63,13 @@ def product_list(request):
 
     return render(request, 'products/product_list.html', {
         'products': products,
-        'low_stock': low_stock,
+        'low_stock': [],
         'category_data': list(category_data),
-        'stock_status': stock_status,
-        'products_json': json.dumps(products_json, cls=DjangoJSONEncoder)
+        'products_json': json.dumps(products_json, cls=DjangoJSONEncoder),
+        'stock_status': None,
+        'product_categories': product_categories
     })
-
+    
 @login_required
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
