@@ -13,4 +13,4 @@ def register(request):
             return redirect('home')
     else:
         form = UserRegistrationForm()  # Use our custom form
-    return render(request, 'registration/register.html', {'form': form}) 
+    return render(request, 'accounts/register.html', {'form': form})
