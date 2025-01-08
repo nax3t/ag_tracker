@@ -10,32 +10,15 @@ from django.core.serializers.json import DjangoJSONEncoder
 import json
 
 def product_list(request):
-    # If user is logged in, show their products, otherwise show all products
-    if request.user.is_authenticated:
-        products = Product.objects.filter(user=request.user)
-        low_stock = products.filter(quantity__lte=models.F('minimum_stock'))
-        
-        # Chart data
-        category_data = products.values('category').annotate(
-            count=Count('id'),
-            total_value=Round(Sum(models.F('quantity') * models.F('cost_per_unit')), 2)
-        ).order_by('-count')
-        
-        stock_status = {
-            'Low Stock': low_stock.count(),
-            'Adequate Stock': products.filter(quantity__gt=models.F('minimum_stock')).count()
-        }
-        
-    else:
-        products = Product.objects.all()
-        low_stock = []
-        
-        # Chart data for all products
-        category_data = products.values('category').annotate(
-            count=Count('id')
-        ).order_by('-count')
-        
-        stock_status = None
+    products = Product.objects.all()
+    low_stock = []
+    
+    # Chart data for all products
+    category_data = products.values('category').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    stock_status = None
 
     # Prepare product location data for the map
     products_json = []
