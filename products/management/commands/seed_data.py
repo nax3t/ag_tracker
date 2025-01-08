@@ -71,31 +71,21 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options['clear']:
-            # Clear existing products
             Product.objects.all().delete()
             self.stdout.write(self.style.SUCCESS('Cleared all existing products'))
-            
-            # Optionally clear users (commented out for safety)
-            # User.objects.exclude(is_superuser=True).delete()
-            # self.stdout.write(self.style.SUCCESS('Cleared all non-superuser users'))
 
-        # Create test users if they don't exist
-        users = []
-        for i in range(1, 4):
-            username = f'test_user_{i}'
-            email = f'test{i}@example.com'
-            user, created = User.objects.get_or_create(
-                username=username,
-                defaults={
-                    'email': email,
-                    'is_active': True
-                }
-            )
-            if created:
-                user.set_password('testpass123')
-                user.save()
-                self.stdout.write(self.style.SUCCESS(f'Created user: {username}'))
-            users.append(user)
+        # Create just one test user if it doesn't exist
+        user, created = User.objects.get_or_create(
+            username='test_user',
+            defaults={
+                'email': 'test@example.com',
+                'is_active': True
+            }
+        )
+        if created:
+            user.set_password('testpass123')
+            user.save()
+            self.stdout.write(self.style.SUCCESS(f'Created user: {user.username}'))
 
         # Base product templates
         product_templates = {
@@ -132,50 +122,65 @@ class Command(BaseCommand):
 
         farm_locations = self.get_farm_locations()
         
-        # Create products for each user
-        for user in users:
-            for category, templates in product_templates.items():
-                # Randomly select 1-3 products from each category
-                selected_templates = random.sample(templates, random.randint(1, len(templates)))
+        # Create 100 products
+        products_to_create = 100
+        products_per_category = products_to_create // len(product_templates)
+        remaining_products = products_to_create % len(product_templates)
+        
+        product_count = 0
+        
+        for category, templates in product_templates.items():
+            # Calculate how many products to create for this category
+            category_products = products_per_category
+            if remaining_products > 0:
+                category_products += 1
+                remaining_products -= 1
                 
-                for template in selected_templates:
-                    # Add variation to quantities and costs
-                    quantity_variation = Decimal(str(random.uniform(0.5, 2.0)))
-                    cost_variation = Decimal(str(random.uniform(0.9, 1.1)))
-                    
-                    # Select random farm location
-                    location = random.choice(farm_locations)
-                    
-                    product_data = {
-                        'name': template['name'],
-                        'category': category,
-                        'quantity': Decimal(str(template['base_quantity'])) * quantity_variation,
-                        'unit': template['unit'],
-                        'cost_per_unit': Decimal(str(template['cost_per_unit'])) * cost_variation,
-                        'minimum_stock': Decimal(str(template['base_quantity'])) * Decimal('0.2'),  # 20% of base quantity
-                        'description': f"Sample {template['name']} for testing",
-                        'supplier': f"{template['name']} Supplier Co.",
-                        'location': f"{location['name']}, {location['city']}, {location['state']}",
-                        'latitude': Decimal(str(location['lat'])),
-                        'longitude': Decimal(str(location['lng'])),
-                    }
-                    
-                    # Add random expiry dates for some products
-                    if random.choice([True, False]):
-                        days_to_expiry = random.randint(30, 365)
-                        product_data['expiry_date'] = timezone.now().date() + timezone.timedelta(days=days_to_expiry)
+            for i in range(category_products):
+                # Cycle through templates if we need more products than templates
+                template = templates[i % len(templates)]
+                
+                # Add variation to quantities and costs
+                quantity_variation = Decimal(str(random.uniform(0.5, 2.0)))
+                cost_variation = Decimal(str(random.uniform(0.9, 1.1)))
+                
+                # Select random farm location
+                location = random.choice(farm_locations)
+                
+                product_data = {
+                    'name': f"{template['name']} #{i+1}",  # Add number to make names unique
+                    'category': category,
+                    'quantity': Decimal(str(template['base_quantity'])) * quantity_variation,
+                    'unit': template['unit'],
+                    'cost_per_unit': Decimal(str(template['cost_per_unit'])) * cost_variation,
+                    'minimum_stock': Decimal(str(template['base_quantity'])) * Decimal('0.2'),
+                    'description': f"Sample {template['name']} #{i+1} for testing",
+                    'supplier': f"{template['name']} Supplier Co.",
+                    'location': f"{location['name']}, {location['city']}, {location['state']}",
+                    'latitude': Decimal(str(location['lat'])),
+                    'longitude': Decimal(str(location['lng'])),
+                }
+                
+                # Add random expiry dates for some products
+                if random.choice([True, False]):
+                    days_to_expiry = random.randint(30, 365)
+                    product_data['expiry_date'] = timezone.now().date() + timezone.timedelta(days=days_to_expiry)
 
-                    product, created = Product.objects.get_or_create(
-                        name=product_data['name'],
-                        user=user,
-                        defaults=product_data
-                    )
-                    
-                    if created:
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f'Created product: {product.name} for user: {user.username}'
-                            )
+                product = Product.objects.create(
+                    user=user,
+                    **product_data
+                )
+                
+                product_count += 1
+                if product_count % 10 == 0:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f'Created {product_count} products...'
                         )
+                    )
 
-        self.stdout.write(self.style.SUCCESS('Successfully seeded the database')) 
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Successfully seeded the database with {product_count} products'
+            )
+        )
