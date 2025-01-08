@@ -3,6 +3,7 @@
 {% block product_title %}{{ product.name }}{% endblock %}
 
 {% block product_actions %}
+{% if user == product.user %}
     <a href="{% url 'products:update' product.pk %}" 
        class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium">
         Edit
@@ -11,6 +12,7 @@
        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium">
         Delete
     </a>
+{% endif %}
 {% endblock %}
 
 {% block product_content %}
